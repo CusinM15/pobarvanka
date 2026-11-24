@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Venv (Windows & WSL)
+.venv/
+venv/
+
+# Generirani izhodi
+test_izhod/
+pobarvanke/
+output/
+*.out.jpg
+
+# OS
+.DS_Store
+Thumbs.db
