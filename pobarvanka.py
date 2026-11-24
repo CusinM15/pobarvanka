@@ -151,19 +151,19 @@ def remove_text(mask: np.ndarray, max_h_frac: float = 0.035,
         removal = ndi.binary_dilation(removal, iterations=pad)                                                     
     return mask & ~removal, len(ids)                                                                               
                                                                                                                 
-def to_coloring_page(                                                                                              
-    img: Image.Image,                                                                                              
-    blur: float = 7.0,                                                                                             
-    offset: float = 10.0,                                                                                          
-    smooth: int = 3,                                                                                               
-    dark_threshold: int = 60,                                                                                      
-    thicken: bool = False,                                                                                         
-    max_size: int = 2000,                                                                                          
-    strip_text: bool = True,                                                                                       
-    text_max_height: float = 0.035,                                                                                
-    text_min_letters: int = 4,                                                                                     
-    text_pad: int = 1,                                                                                             
-):                                                                                                                 
+def to_coloring_page(                                                                                                 
+    img: Image.Image,                                                                                                 
+    blur: float = 4.0,                                                                                                
+    offset: float = 7.0,                                                                                              
+    smooth: int = 3,                                                                                                  
+    dark_threshold: int = 0,                                                                                          
+    thicken: bool = False,                                                                                            
+    max_size: int = 2000,                                                                                             
+    strip_text: bool = True,                                                                                          
+    text_max_height: float = 0.035,                                                                                   
+    text_min_letters: int = 4,                                                                                        
+    text_pad: int = 1,                                                                                                
+):                                                                                                                   
     """Pretvori PIL sliko v strogo črno-belo pobarvanko. Vrni (slika, št._odstranjenih_besedil)."""                
     img = flatten_on_white(img)                                                                                    
                                                                                                                 
@@ -215,14 +215,14 @@ def main(argv=None):
                 help="mapa z vhodnimi slikami; privzeto test_vhod")                                             
     p.add_argument("output_dir", nargs="?", default="test_izhod",                                                  
                 help="mapa za shranjevanje pobarvank; privzeto test_izhod")                                     
-    p.add_argument("--blur", type=float, default=7.0,                                                              
-                help="radij zameglitve ozadja; večji = debelejše/manj črt (privzeto 7)")                        
-    p.add_argument("--offset", type=float, default=10.0,                                                           
-                help="občutljivost pragu; manjši = več črt/detajlov (privzeto 10)")                             
+    p.add_argument("--blur", type=float, default=4.0,                                                              
+                help="radij zameglitve ozadja; večji = debelejše/manj črt (privzeto 4)")                       
+    p.add_argument("--offset", type=float, default=7.0,                                                          
+                help="občutljivost pragu; manjši = več črt/detajlov (privzeto 7)")                            
     p.add_argument("--smooth", type=int, default=3,                                                                
                 help="median filter za šum (privzeto 3, 0 = izklop)")                                           
-    p.add_argument("--dark-threshold", type=int, default=60,                                                       
-                help="prag za ohranitev zelo temnih ploskev (privzeto 60)")                                     
+    p.add_argument("--dark-threshold", type=int, default=0,                                                       
+                help="prag za ohranitev zelo temnih ploskev; 0 = izklop (privzeto 0, tanke črte)")              
     p.add_argument("--thicken", action="store_true",                                                               
                 help="odebeli črte (bolj izrazita pobarvanka)")                                                 
     p.add_argument("--max-size", type=int, default=2000,                                                           
@@ -309,5 +309,5 @@ def main(argv=None):
     print(f"Izhodna mapa: {os.path.abspath(args.output_dir)}")                                                     
     return 0 if err == 0 else 2                                                                                    
                                                                                                                 
-if name == "main":                                                                                                 
+if __name__ == "__main__":                                                                                                 
     raise SystemExit(main()) 

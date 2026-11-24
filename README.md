@@ -39,10 +39,10 @@ python3 pobarvanka.py slike pobarvanke --recursive
 
 | Opcija | Privzeto | Pomen |
 |---|---|---|
-| `--blur` | 7 | radij zameglitve ozadja; **večji = manj, debelejše** črte |
-| `--offset` | 10 | občutljivost pragu; **manjši = več črt/detajlov** |
+| `--blur` | 4 | radij zameglitve ozadja; **večji = manj, debelejše** črte |
+| `--offset` | 7 | občutljivost pragu; **manjši = več črt/detajlov** |
 | `--smooth` | 3 | median filter za odstranjevanje šuma (0 = izklop) |
-| `--dark-threshold` | 60 | ohrani zelo temne ploskve kot črne |
+| `--dark-threshold` | 0 | **0 = izklop** (privzeto, tanke črte); večje vrednosti zalijejo temne ploskve v črno |
 | `--thicken` | izklop | odebeli črte za 1 px |
 | `--max-size` | 2000 | največja dolžina stranice pred obdelavo |
 | `--fmt` | png | izhodni format (`png` ali `jpg`) |
@@ -60,6 +60,7 @@ python3 pobarvanka.py slike pobarvanke --recursive
 
 ## Nasveti za nastavljanje
 
-- preveč črnih blokov / pack → povečaj `--offset` (npr. 15–20) ali `--dark-threshold` nižje
-- premalo detajlov (skoraj prazno) → zmanjšaj `--offset` (npr. 5–8) in `--blur` (npr. 4–6)
+- preveč črnih blokov / pack → zmanjšaj `--offset` ali `--blur`; če je `--dark-threshold` > 0, ga postavi nazaj na 0
+- premalo detajlov (skoraj prazno) → zmanjšaj `--offset` (npr. 5) in `--blur` (npr. 3)
 - preveč drobnih črt / šum → povečaj `--smooth` (npr. 5)
+- resnično temne ploskve (polna črnina v foto) želiš zaliti → dvigni `--dark-threshold` (npr. 40–60), a s tem odebeliš rob
