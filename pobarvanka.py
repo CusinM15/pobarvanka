@@ -216,12 +216,13 @@ def remove_text(mask: np.ndarray, max_h_frac: float = 0.035,
 def to_coloring_page(                                                                                                 
     img: Image.Image,                                                                                                 
     blur: float = 4.0,                                                                                                
-    offset: float = 9.0,                                                                                              
+    offset: float = 11.0,                                                                                              
     smooth: int = 3,                                                                                                  
     dark_threshold: int = 0,                                                                                          
     thicken: bool = False,                                                                                            
     hollow: bool = True,
-    hollow_radius: int = 1,
+    hollow_radius: int = 2,
+    min_line_area: int = 20,
     max_size: int = 2000,                                                                                             
     strip_text: bool = True,                                                                                          
     ocr_text: bool = False,
@@ -265,6 +266,9 @@ def to_coloring_page(
     if hollow and ndi is not None:                                                                                
         # zalite temne ploskve -> zgolj tanek obris (notranjost postane bela)                                      
         mask = hollow_solid(mask, hollow_radius)                                                                  
+    if min_line_area > 0 and ndi is not None:                                                                     
+        # droben šum in bravni elementi znotraj ploskev -> pobeli (ilustracija manj močna)                         
+        mask = remove_small_fragments(mask, min_line_area)                                                        
     page = Image.fromarray(np.where(mask, 0, 255).astype(np.uint8), mode="L")                                     
 
     if thicken:                                                                                                    
@@ -276,6 +280,22 @@ def to_coloring_page(
                                                                                                                 
     return page, removed                                                                                           
                                                                                                                 
+def remove_small_fragments(mask: np.ndarray, min_area: int) -> np.ndarray:
+    """Odstrani drobne temne fragmente (šum), ki so manjši od `min_area` px.
+
+    Tako notranjost elementov postane dejansko bela (ostanejo samo glavne
+    konture) in ilustracija je 'manj močna'. Če min_area<=0, ne spremeni nič.
+    """
+    if min_area <= 0 or ndi is None or not mask.any():
+        return mask
+    lab, n = ndi.label(mask, np.ones((3, 3), dtype=bool))
+    if n == 0:
+        return mask
+    sizes = ndi.sum(mask, lab, range(1, n + 1))
+    keep = sizes >= min_area
+    return np.isin(lab, np.flatnonzero(keep) + 1)
+
+
 def _rasterize_pdf(pdf_path: str, dpi: int = 200) -> list:
     """Pretvori PDF v začasne PNG datoteke (ena na stran) z pdftoppm.
 
@@ -326,7 +346,7 @@ def main(argv=None):
                 help="mapa za shranjevanje pobarvank; privzeto test_izhod")                                     
     p.add_argument("--blur", type=float, default=4.0,                                                              
                 help="radij zameglitve ozadja; večji = debelejše/manj črt (privzeto 4)")                       
-    p.add_argument("--offset", type=float, default=9.0,
+    p.add_argument("--offset", type=float, default=11.0,
                 help="občutljivost pragu; manjši = več črt/detajlov (privzeto 9; manj zatemnjeno za senčene predela)")
     p.add_argument("--smooth", type=int, default=3,                                                                
                 help="median filter za šum (privzeto 3, 0 = izklop)")                                           
@@ -336,8 +356,9 @@ def main(argv=None):
                 help="odebeli črte (bolj izrazita pobarvanka)")                                                 
     p.add_argument("--no-hollow", action="store_true",                                                          
                 help="NE izdolbi zalitih temnih ploskev (privzeto se izdolbejo na obris)")                     
-    p.add_argument("--hollow-radius", type=int, default=1,                                                        
-                help="debelina obrisa pri izdolbenju zalitih ploskev (privzeto 1; tanjsi obris = manj zatemnjene stene)")
+    p.add_argument("--hollow-radius", type=int, default=2,                help="debelina obrisa pri izdolbenju zalitih ploskev (privzeto 2)")
+    p.add_argument("--min-line-area", type=int, default=20,
+                help="odstrani drobne temne fragmente (sum) manjse od N px; vecji = svetlejsa cistejsa pobarvanka (privzeto 20; 0 = izklop)")
     p.add_argument("--max-size", type=int, default=2000,                                                           
                 help="največja dolžina stranice pred obdelavo (privzeto 2000)")                                 
     p.add_argument("--fmt", choices=["png", "jpg"], default="png",                                                 
@@ -416,6 +437,7 @@ def main(argv=None):
                         thicken=args.thicken,
                         hollow=not args.no_hollow,
                         hollow_radius=args.hollow_radius,
+                        min_line_area=args.min_line_area,
                         max_size=args.max_size,
                         strip_text=not args.keep_text,
                         ocr_text=args.ocr_text,
