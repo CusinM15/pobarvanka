@@ -1,8 +1,10 @@
 # pobarvanka.py
 
-Pretvori slike (jpg, png, bmp, tif, webp) v **črno-bele pobarvanke** (line-art:
-črne črte na belem ozadju). Gre čez vse slike v vhodni mapi in jih shrani v
-izhodno mapo — **izhodno mapo ustvari sam, če ne obstaja**.
+Pretvori slike (jpg, png, bmp, tif, webp **in PDF**) v **črno-bele pobarvanke**
+(line-art: črne črte na belem ozadju). Gre čez vse slike v vhodni mapi in jih
+shrani v izhodno mapo — **izhodno mapo ustvari sam, če ne obstaja**. PDF-je
+samodejno rasterizira v posamezne strani (eno izhodno datoteko na stran:
+`ime_strana1.png`, …) s popplerjevim `pdftoppm`.
 
 ## Namestitev
 
@@ -12,6 +14,12 @@ python3 -m venv ~/.venvs/pobarvanka
 ```
 
 (ali kjer koli: `pip install Pillow numpy`)
+
+Za PDF vhode potrebuješ tudi poppler:
+
+```
+sudo apt install poppler-utils      # pdftoppm
+```
 
 ## Uporaba
 

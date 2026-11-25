@@ -36,7 +36,7 @@ try:
 except ImportError:  # scipy je potreben le za odstranjevanje besedila                                             
     ndi = None                                                                                                     
                                                                                                                 
-INPUT_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}                                           
+INPUT_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp", ".pdf"}                                           
                                                                                                                 
 def flatten_on_white(img: Image.Image) -> Image.Image:                                                             
     """Splošči prosojnost na belo ozadje (prosojnost -> bela, ne črna)."""                                         
@@ -276,6 +276,32 @@ def to_coloring_page(
                                                                                                                 
     return page, removed                                                                                           
                                                                                                                 
+def _rasterize_pdf(pdf_path: str, dpi: int = 200) -> list:
+    """Pretvori PDF v začasne PNG datoteke (ena na stran) z pdftoppm.
+
+    PIL ne more odpreti PDF-ja neposredno, zato ga rasteriziramo s popplerjevim
+    `pdftoppm`. Vrne seznam poti do začasnih PNG-jev; kličoča stran jih pobriše.
+    Če pdftoppm ni na voljo ali pretvorba pade, vržemo RuntimeError.
+    """
+    if shutil.which("pdftoppm") is None:
+        raise RuntimeError("pdf vhod zahteva 'pdftoppm' (sudo apt install poppler-utils)")
+    import tempfile
+    tmpdir = tempfile.mkdtemp(prefix="pobarvanka_pdf_")
+    prefix = os.path.join(tmpdir, "page")
+    p = subprocess.run(
+        ["pdftoppm", "-png", "-r", str(dpi), pdf_path, prefix],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=300,
+    )
+    if p.returncode != 0:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        raise RuntimeError(f"pdftoppm ni uspel: {p.stderr.decode('utf-8','replace').strip()}")
+    pages = sorted(os.path.join(tmpdir, f) for f in os.listdir(tmpdir) if f.endswith(".png"))
+    if not pages:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        raise RuntimeError("pdftoppm ni ustvaril nobene strani")
+    return pages
+
+
 def find_images(folder: str, recursive: bool):                                                                     
     found = []                                                                                                     
     if recursive:                                                                                                  
@@ -346,56 +372,78 @@ def main(argv=None):
         print(f"V vhodni mapi ni slik ({', '.join(sorted(INPUT_EXTS))}).")                                         
         return 0                                                                                                   
                                                                                                                 
-    ext = "." + args.fmt                                                                                           
-    ok = skip = err = 0                                                                                            
-    for path in images:                                                                                            
-        name = os.path.splitext(os.path.basename(path))[0] + ext                                                   
-        if args.recursive:                                                                                         
-            rel = os.path.relpath(os.path.dirname(path), args.input_dir)                                           
-            out_dir = args.output_dir if rel == "." else os.path.join(args.output_dir, rel)                        
-            os.makedirs(out_dir, exist_ok=True)                                                                    
-            out_path = os.path.join(out_dir, name)                                                                 
-        else:                                                                                                      
-            out_path = os.path.join(args.output_dir, name)                                                         
-                                                                                                                
-        if os.path.exists(out_path) and not args.overwrite:                                                        
-            print(f"preskočeno (obstaja): {out_path}")                                                             
-            skip += 1                                                                                              
-            continue                                                                                               
-                                                                                                                
-        try:                                                                                                       
-            with Image.open(path) as im:                                                                           
-                page, removed = to_coloring_page(                                                                  
-                    im,                                                                                            
-                    blur=args.blur,                                                                                
-                    offset=args.offset,                                                                            
-                    smooth=args.smooth,                                                                            
-                    dark_threshold=args.dark_threshold,                                                            
-                    thicken=args.thicken,                                                                          
-                    hollow=not args.no_hollow,                                                                     
-                    hollow_radius=args.hollow_radius,                                                              
-                    max_size=args.max_size,                                                                        
-                    strip_text=not args.keep_text,                                                                 
-                    ocr_text=args.ocr_text,                                                                        
-                    text_max_height=args.text_max_height,                                                          
-                    text_min_letters=args.text_min_letters,                                                        
-                    text_pad=args.text_pad,                                                                        
-                )                                                                                                  
-            if args.fmt == "jpg":                                                                                  
-                page.save(out_path, quality=95, subsampling=0)                                                     
-                print("OPOZORILO: JPG vedno doda sivino/artefakte; za strogo "                                     
-                    "črno-belo uporabi --fmt png", file=sys.stderr)                                              
-            else:                                                                                                  
-                page.save(out_path, format="PNG", optimize=True)                                                   
-                                                                                                                
-            uniq = np.unique(np.asarray(page))                                                                     
-            strict = len(uniq) <= 2 and set(uniq.tolist()) <= {0, 255}                                             
-            print(f"OK  {path} -> {out_path}  (odstranjenih besedilnih elementov: {removed}, "                     
-                f"strogo črno-belo: {'da' if strict else 'NE'})")                                                
-            ok += 1                                                                                                
-        except Exception as e:  # noqa: BLE001                                                                     
-            print(f"NAPAKA pri {path}: {e}", file=sys.stderr)                                                      
-            err += 1                                                                                               
+    ext = "." + args.fmt
+    ok = skip = err = 0
+    for path in images:
+        is_pdf = os.path.splitext(path)[1].lower() == ".pdf"
+        pageno = 0
+        # Vhodne slike; za PDF razširi na posamezne strani (ene ali več).
+        try:
+            sources = _rasterize_pdf(path) if is_pdf else [path]
+        except Exception as e:  # noqa: BLE001
+            print(f"NAPAKA pri {path}: {e}", file=sys.stderr)
+            err += 1
+            continue
+
+        for src in sources:
+            if is_pdf:
+                pageno += 1
+                name = (os.path.splitext(os.path.basename(path))[0]
+                        + ("_strana%d" % pageno) + ext)
+            else:
+                name = os.path.splitext(os.path.basename(path))[0] + ext
+            if args.recursive:
+                rel = os.path.relpath(os.path.dirname(path), args.input_dir)
+                out_dir = args.output_dir if rel == "." else os.path.join(args.output_dir, rel)
+                os.makedirs(out_dir, exist_ok=True)
+                out_path = os.path.join(out_dir, name)
+            else:
+                out_path = os.path.join(args.output_dir, name)
+
+            if os.path.exists(out_path) and not args.overwrite:
+                print(f"preskočeno (obstaja): {out_path}")
+                skip += 1
+                continue
+
+            try:
+                with Image.open(src) as im:
+                    page, removed = to_coloring_page(
+                        im,
+                        blur=args.blur,
+                        offset=args.offset,
+                        smooth=args.smooth,
+                        dark_threshold=args.dark_threshold,
+                        thicken=args.thicken,
+                        hollow=not args.no_hollow,
+                        hollow_radius=args.hollow_radius,
+                        max_size=args.max_size,
+                        strip_text=not args.keep_text,
+                        ocr_text=args.ocr_text,
+                        text_max_height=args.text_max_height,
+                        text_min_letters=args.text_min_letters,
+                        text_pad=args.text_pad,
+                    )
+                if args.fmt == "jpg":
+                    page.save(out_path, quality=95, subsampling=0)
+                    print("OPOZORILO: JPG vedno doda sivino/artefakte; za strogo "
+                        "črno-belo uporabi --fmt png", file=sys.stderr)
+                else:
+                    page.save(out_path, format="PNG", optimize=True)
+
+                uniq = np.unique(np.asarray(page))
+                strict = len(uniq) <= 2 and set(uniq.tolist()) <= {0, 255}
+                print(f"OK  {path} -> {out_path}  (odstranjenih besedilnih elementov: {removed}, "
+                    f"strogo črno-belo: {'da' if strict else 'NE'})")
+                ok += 1
+            except Exception as e:  # noqa: BLE001
+                print(f"NAPAKA pri {path}: {e}", file=sys.stderr)
+                err += 1
+
+        # Počisti začasne PNG-je iz rasterizacije PDF-ja.
+        if is_pdf and sources:
+            tmpdir = os.path.dirname(sources[0])
+            if tmpdir and os.path.isdir(tmpdir):
+                shutil.rmtree(tmpdir, ignore_errors=True)
                                                                                                                 
     print(f"\nKončano: {ok} ustvarjenih, {skip} preskočenih, {err} napak.")                                        
     print(f"Izhodna mapa: {os.path.abspath(args.output_dir)}")                                                     
