@@ -56,6 +56,7 @@ python3 pobarvanka.py slike pobarvanke --recursive
 | `--hollow-radius` | 2 | debelina obrisa pri izdolbenju temnih ploskev (v px); večji = debelejši rob |
 | `--min-line-area` | 20 | odstrani drobne temne ostanke (šum/tiskani elementi) manjše od N px, da je notranjost elementov bela; večji = svetlejša, `0` = izklop |
 | `--ocr-text` | **izklopljeno** | odstr. teksta s tesseract OCR (samo za čisto skenirano prozo; na ilustracijah pobeli tudi risbo) |
+| `--strip-text` | izklop | odstrani besedilo/napise (component-based); **privzeto tekst ostane** |
 | `--max-size` | 2000 | največja dolžina stranice pred obdelavo |
 | `--fmt` | png | izhodni format (`png` ali `jpg`) |
 | `--recursive` | izklop | preglej tudi podmape |
