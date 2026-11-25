@@ -48,13 +48,13 @@ python3 pobarvanka.py slike pobarvanke --recursive
 | Opcija | Privzeto | Pomen |
 |---|---|---|
 | `--blur` | 4 | radij zameglitve ozadja; **večji = manj, debelejše** črte |
-| `--offset` | 7 | občutljivost pragu; **manjši = več črt/detajlov** |
+| `--offset` | 9 | občutljivost pragu; **manjši = več črt/detajlov**; večji = manj zatemnjeno za senčene predela |
 | `--smooth` | 3 | median filter za odstranjevanje šuma (0 = izklop) |
 | `--dark-threshold` | 0 | **0 = izklop** (privzeto, tanke črte); večje vrednosti zalijejo temne ploskve v črno |
 | `--thicken` | izklop | odebeli črte za 1 px |
 | `--no-hollow` | 2 | zalite temne ploskve skrči na tanek obris (OFF = obdrži napolnjena) |
 | `--hollow-radius` | 2 | debelina obrisa pri izdolbenju (v px) |
-| `--ocr-text` | izklop | odstr. teksta s tesseract OCR (za skenirano prozo/članke) |
+| `--ocr-text` | **vklopljeno** | odstr. teksta s tesseract OCR (prednostno za skenirano prozo/članke); izklopi z `--no-ocr-text` |
 | `--max-size` | 2000 | največja dolžina stranice pred obdelavo |
 | `--fmt` | png | izhodni format (`png` ali `jpg`) |
 | `--recursive` | izklop | preglej tudi podmape |
