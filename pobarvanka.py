@@ -224,7 +224,7 @@ def to_coloring_page(
     hollow_radius: int = 1,
     max_size: int = 2000,                                                                                             
     strip_text: bool = True,                                                                                          
-    ocr_text: bool = True,
+    ocr_text: bool = False,
     text_max_height: float = 0.035,                                                                                   
     text_min_letters: int = 4,                                                                                        
     text_pad: int = 1,                                                                                                
@@ -348,10 +348,8 @@ def main(argv=None):
     # --- odstranjevanje besedila ---                                                                              
     p.add_argument("--keep-text", action="store_true",                                                             
                 help="NE odstranjuj besedila/napisov")                                                          
-    p.add_argument("--ocr-text", dest="ocr_text", action="store_true", default=True,
-                help=argparse.SUPPRESS)
-    p.add_argument("--no-ocr-text", dest="ocr_text", action="store_false",
-                help="odstrani tekst BREZ tesseract OCR (component-based, za navadne napise/watermarke)")
+    p.add_argument("--ocr-text", dest="ocr_text", action="store_true", default=False,
+                help="odstrani tekst z uporabo tesseract OCR (za skenirano prozo brez ilustracij)")
     p.add_argument("--text-max-height", type=float, default=0.035,                                                 
                 help="največja višina črke kot delež višine slike (privzeto 0.035 = 3,5%%)")                    
     p.add_argument("--text-min-letters", type=int, default=4,                                                      
