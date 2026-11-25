@@ -48,7 +48,7 @@ python3 pobarvanka.py slike pobarvanke --recursive
 | Opcija | Privzeto | Pomen |
 |---|---|---|
 | `--blur` | 4 | radij zameglitve ozadja; **večji = manj, debelejše** črte |
-| `--offset` | 11 | občutljivost pragu; **manjši = več črt/detajlov**; večji = svetlejša, manj močna pobarvanka |
+| `--offset` | 16 | občutljivost pragu; **manjši = več črt/detajlov**; večji = svetlejša, manj temne stene |
 | `--smooth` | 3 | median filter za odstranjevanje šuma (0 = izklop) |
 | `--dark-threshold` | 0 | **0 = izklop** (privzeto, tanke črte); večje vrednosti zalijejo temne ploskve v črno |
 | `--thicken` | izklop | odebeli črte za 1 px |

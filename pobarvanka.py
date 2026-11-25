@@ -216,7 +216,7 @@ def remove_text(mask: np.ndarray, max_h_frac: float = 0.035,
 def to_coloring_page(                                                                                                 
     img: Image.Image,                                                                                                 
     blur: float = 4.0,                                                                                                
-    offset: float = 11.0,                                                                                              
+    offset: float = 16.0,                                                                                              
     smooth: int = 3,                                                                                                  
     dark_threshold: int = 0,                                                                                          
     thicken: bool = False,                                                                                            
@@ -346,8 +346,8 @@ def main(argv=None):
                 help="mapa za shranjevanje pobarvank; privzeto test_izhod")                                     
     p.add_argument("--blur", type=float, default=4.0,                                                              
                 help="radij zameglitve ozadja; večji = debelejše/manj črt (privzeto 4)")                       
-    p.add_argument("--offset", type=float, default=11.0,
-                help="občutljivost pragu; manjši = več črt/detajlov (privzeto 9; manj zatemnjeno za senčene predela)")
+    p.add_argument("--offset", type=float, default=16.0,
+                help="občutljivost pragu; manjši = več črt/detajlov (privzeto 16; visji prag = svetlejsa, manj temne stene)")
     p.add_argument("--smooth", type=int, default=3,                                                                
                 help="median filter za šum (privzeto 3, 0 = izklop)")                                           
     p.add_argument("--dark-threshold", type=int, default=0,                                                       
