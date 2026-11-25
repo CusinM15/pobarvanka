@@ -224,7 +224,7 @@ def to_coloring_page(
     hollow_radius: int = 2,
     min_line_area: int = 20,
     max_size: int = 2000,                                                                                             
-    strip_text: bool = True,                                                                                          
+    strip_text: bool = False,                                                                                          
     ocr_text: bool = False,
     text_max_height: float = 0.035,                                                                                   
     text_min_letters: int = 4,                                                                                        
@@ -367,8 +367,10 @@ def main(argv=None):
     p.add_argument("--overwrite", action="store_true",                                                             
                 help="prepiši obstoječe izhodne datoteke")                                                      
     # --- odstranjevanje besedila ---                                                                              
-    p.add_argument("--keep-text", action="store_true",                                                             
-                help="NE odstranjuj besedila/napisov")                                                          
+    p.add_argument("--keep-text", action="store_true", default=True,
+                help="(privzeto) ohrani besedilo/napise kot na originalu; uporabi --strip-text za odstranitev")
+    p.add_argument("--strip-text", dest="strip_text", action="store_true", default=False,
+                help="odstrani besedilo/napise (component-based; privzeto tekst ostane)")
     p.add_argument("--ocr-text", dest="ocr_text", action="store_true", default=False,
                 help="odstrani tekst z uporabo tesseract OCR (za skenirano prozo brez ilustracij)")
     p.add_argument("--text-max-height", type=float, default=0.035,                                                 
@@ -439,7 +441,7 @@ def main(argv=None):
                         hollow_radius=args.hollow_radius,
                         min_line_area=args.min_line_area,
                         max_size=args.max_size,
-                        strip_text=not args.keep_text,
+                        strip_text=args.strip_text,
                         ocr_text=args.ocr_text,
                         text_max_height=args.text_max_height,
                         text_min_letters=args.text_min_letters,
