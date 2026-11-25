@@ -44,6 +44,9 @@ python3 pobarvanka.py slike pobarvanke --recursive
 | `--smooth` | 3 | median filter za odstranjevanje šuma (0 = izklop) |
 | `--dark-threshold` | 0 | **0 = izklop** (privzeto, tanke črte); večje vrednosti zalijejo temne ploskve v črno |
 | `--thicken` | izklop | odebeli črte za 1 px |
+| `--no-hollow` | 2 | zalite temne ploskve skrči na tanek obris (OFF = obdrži napolnjena) |
+| `--hollow-radius` | 2 | debelina obrisa pri izdolbenju (v px) |
+| `--ocr-text` | izklop | odstr. teksta s tesseract OCR (za skenirano prozo/članke) |
 | `--max-size` | 2000 | največja dolžina stranice pred obdelavo |
 | `--fmt` | png | izhodni format (`png` ali `jpg`) |
 | `--recursive` | izklop | preglej tudi podmape |
@@ -55,7 +58,7 @@ python3 pobarvanka.py slike pobarvanke --recursive
 2. slika → siva + median filter (odstrani šum),
 3. **adaptivni prag**: piksel je črta, če je bistveno temnejši od lokalnega
    povprečja (Gaussovo zamegljeno ozadje) → črte ne glede na svetlost predelov,
-4. ohrani tudi zelo temne ploskve,
+4. zalite temne ploskve **izdolbe na tanek obris** (notranjost pobeli) — a kdor želi, jih lahko pusti napolnjene (`--no-hollow`),
 5. neobvezno odebeli črte.
 
 ## Nasveti za nastavljanje

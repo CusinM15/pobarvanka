@@ -21,7 +21,11 @@ Odvisnosti:
 """                                                                                                                
                                                                                                                 
 import argparse                                                                                                    
+import csv                                                                                                         
+import io                                                                                                          
 import os                                                                                                          
+import shutil                                                                                                      
+import subprocess                                                                                                  
 import sys                                                                                                         
                                                                                                                 
 import numpy as np                                                                                                 
@@ -131,6 +135,64 @@ def _find_text_ids(stats, width: int, height: int,
             ids.add(i["id"])                                                                                       
     return ids                                                                                                     
                                                                                                                 
+def _tesseract_text_mask(img) -> np.ndarray | None:
+    """Vrni bool masko (True=besedilo) z uporabo tesseract OCR, ali None če ni na voljo.
+
+    Masko vrne v koordinatah posredovane slike `img`. Besedilo poišče z OCR
+    na polni ločljivosti in regije razširi, da pokrije tudi neprepoznane znake.
+    """
+    if shutil.which("tesseract") is None:
+        return None
+    try:
+        w, h = img.size
+        buf = io.BytesIO()
+        img.convert("RGB").save(buf, format="PNG")
+        p = subprocess.run(
+            ["tesseract", "stdin", "stdout", "--psm", "6", "tsv"],
+            input=buf.getvalue(), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            timeout=60,
+        )
+        if p.returncode != 0:
+            return None
+        rows = csv.DictReader(io.StringIO(p.stdout.decode("utf-8", "replace")), delimiter="\t")
+        boxes = []
+        for r in rows:
+            lvl = (r.get("level") or "").strip()
+            if lvl != "4":  # line-level (v TSV je text stolpec na line nivoju prazen)
+                continue
+            try:
+                boxes.append((int(r["left"]), int(r["top"]), int(r["width"]), int(r["height"])))
+            except (ValueError, KeyError):
+                continue
+        if not boxes:
+            return None
+        mask = np.zeros((h, w), dtype=bool)
+        step = max(1, int(2000 / max(w, h)))  # OCR deluje na ~2000px ločljivosti
+        for x, y, bw, bh in boxes:
+            y0, x0 = max(0, y - 2), max(0, x - 2)
+            y1, x1 = min(h, y + bh + 2), min(w, x + bw + 2)
+            mask[y0:y1, x0:x1] = True
+        # razširi za 1-2px, da pokrije mehke robove in spajanje črk
+        if ndi is not None:
+            mask = ndi.binary_dilation(mask, iterations=1)
+        return mask
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def hollow_solid(mask: np.ndarray, radius: int = 2) -> np.ndarray:
+    """Zalite (polne) temne ploskve skrči na tanek OBRIS.
+
+    Ideja: tanka črta po eroziji za `radius` izgine -> izraz (maske & ~erodirano)
+    črto ohrani. Polna ploskev pa ima notranjost, ki po eroziji še ostane ->
+    erodirano odštejemo in od zalitve ostane samo zunanji obroč debeline `radius`.
+    """
+    if not mask.any():
+        return mask
+    inner = ndi.binary_erosion(mask, iterations=max(1, radius))
+    return mask & ~inner
+
+
 def remove_text(mask: np.ndarray, max_h_frac: float = 0.035,                                                       
                 min_members: int = 4, pad: int = 1):                                                               
     """Odstrani besedilu podobne komponente iz maske. Vrni (nova_maska, št._odstranjenih)."""                      
@@ -158,32 +220,53 @@ def to_coloring_page(
     smooth: int = 3,                                                                                                  
     dark_threshold: int = 0,                                                                                          
     thicken: bool = False,                                                                                            
+    hollow: bool = True,
+    hollow_radius: int = 2,
     max_size: int = 2000,                                                                                             
     strip_text: bool = True,                                                                                          
+    ocr_text: bool = False,
     text_max_height: float = 0.035,                                                                                   
     text_min_letters: int = 4,                                                                                        
     text_pad: int = 1,                                                                                                
 ):                                                                                                                   
     """Pretvori PIL sliko v strogo črno-belo pobarvanko. Vrni (slika, št._odstranjenih_besedil)."""                
-    img = flatten_on_white(img)                                                                                    
-                                                                                                                
-    w, h = img.size                                                                                                
-    if max(w, h) > max_size:                                                                                       
-        scale = max_size / float(max(w, h))                                                                        
-        img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)                          
-                                                                                                                
-    gray = img.convert("L")                                                                                        
-    if smooth and smooth >= 3:                                                                                     
-        gray = gray.filter(ImageFilter.MedianFilter(size=smooth))                                                  
-                                                                                                                
-    mask = build_mask(gray, blur, offset, dark_threshold)                                                          
-                                                                                                                
-    removed = 0                                                                                                    
-    if strip_text:                                                                                                 
+    img = flatten_on_white(img)                                                                                   
+
+    # OCR detekcija teksta na polni ločljivosti (pred pomanjšanjem), če je omogočena
+    ocr_mask = None
+    if ocr_text:
+        ocr_mask = _tesseract_text_mask(img)
+
+    w, h = img.size                                                                                               
+    if max(w, h) > max_size:                                                                                      
+        scale = max_size / float(max(w, h))                                                                       
+        img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)                         
+        if ocr_mask is not None:
+            nw, nh = img.size
+            from PIL import Image as _I
+            ocr_mask = _I.fromarray(ocr_mask.astype(np.uint8) * 255).resize((nw, nh), _I.BILINEAR)
+            ocr_mask = np.asarray(ocr_mask) > 127
+                                                                                                               
+    gray = img.convert("L")                                                                                       
+    # pobeli besedilne regije iz sivo (OCR) pred binarizacijo
+    if ocr_mask is not None:
+        arr = np.asarray(gray, np.uint8).copy()
+        arr[ocr_mask] = 255
+        gray = Image.fromarray(arr, "L")
+
+    if smooth and smooth >= 3:                                                                                    
+        gray = gray.filter(ImageFilter.MedianFilter(size=smooth))                                                 
+                                                                                                               
+    mask = build_mask(gray, blur, offset, dark_threshold)                                                         
+                                                                                                               
+    removed = 0                                                                                                  
+    if strip_text:                                                                                                
         mask, removed = remove_text(mask, text_max_height, text_min_letters, text_pad)                             
-                                                                                                                
-    page = Image.fromarray(np.where(mask, 0, 255).astype(np.uint8), mode="L")                                      
-                                                                                                                
+    if hollow and ndi is not None:                                                                                
+        # zalite temne ploskve -> zgolj tanek obris (notranjost postane bela)                                      
+        mask = hollow_solid(mask, hollow_radius)                                                                  
+    page = Image.fromarray(np.where(mask, 0, 255).astype(np.uint8), mode="L")                                     
+
     if thicken:                                                                                                    
         page = page.filter(ImageFilter.MaxFilter(size=3))                                                          
                                                                                                                 
@@ -223,8 +306,12 @@ def main(argv=None):
                 help="median filter za šum (privzeto 3, 0 = izklop)")                                           
     p.add_argument("--dark-threshold", type=int, default=0,                                                       
                 help="prag za ohranitev zelo temnih ploskev; 0 = izklop (privzeto 0, tanke črte)")              
-    p.add_argument("--thicken", action="store_true",                                                               
+    p.add_argument("--thicken", action="store_true",                                                              
                 help="odebeli črte (bolj izrazita pobarvanka)")                                                 
+    p.add_argument("--no-hollow", action="store_true",                                                          
+                help="NE izdolbi zalitih temnih ploskev (privzeto se izdolbejo na obris)")                     
+    p.add_argument("--hollow-radius", type=int, default=2,                                                        
+                help="debelina obrisa pri izdolbenju zalitih ploskev (privzeto 2)")                           
     p.add_argument("--max-size", type=int, default=2000,                                                           
                 help="največja dolžina stranice pred obdelavo (privzeto 2000)")                                 
     p.add_argument("--fmt", choices=["png", "jpg"], default="png",                                                 
@@ -235,6 +322,8 @@ def main(argv=None):
     # --- odstranjevanje besedila ---                                                                              
     p.add_argument("--keep-text", action="store_true",                                                             
                 help="NE odstranjuj besedila/napisov")                                                          
+    p.add_argument("--ocr-text", action="store_true",                                                             
+                help="odstrani tekst z uporabo tesseract OCR (za skenirano prozo/članke)")                   
     p.add_argument("--text-max-height", type=float, default=0.035,                                                 
                 help="največja višina črke kot delež višine slike (privzeto 0.035 = 3,5%%)")                    
     p.add_argument("--text-min-letters", type=int, default=4,                                                      
@@ -283,8 +372,11 @@ def main(argv=None):
                     smooth=args.smooth,                                                                            
                     dark_threshold=args.dark_threshold,                                                            
                     thicken=args.thicken,                                                                          
+                    hollow=not args.no_hollow,                                                                     
+                    hollow_radius=args.hollow_radius,                                                              
                     max_size=args.max_size,                                                                        
                     strip_text=not args.keep_text,                                                                 
+                    ocr_text=args.ocr_text,                                                                        
                     text_max_height=args.text_max_height,                                                          
                     text_min_letters=args.text_min_letters,                                                        
                     text_pad=args.text_pad,                                                                        
