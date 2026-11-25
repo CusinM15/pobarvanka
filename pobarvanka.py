@@ -221,7 +221,7 @@ def to_coloring_page(
     dark_threshold: int = 0,                                                                                          
     thicken: bool = False,                                                                                            
     hollow: bool = True,
-    hollow_radius: int = 2,
+    hollow_radius: int = 1,
     max_size: int = 2000,                                                                                             
     strip_text: bool = True,                                                                                          
     ocr_text: bool = True,
@@ -336,8 +336,8 @@ def main(argv=None):
                 help="odebeli črte (bolj izrazita pobarvanka)")                                                 
     p.add_argument("--no-hollow", action="store_true",                                                          
                 help="NE izdolbi zalitih temnih ploskev (privzeto se izdolbejo na obris)")                     
-    p.add_argument("--hollow-radius", type=int, default=2,                                                        
-                help="debelina obrisa pri izdolbenju zalitih ploskev (privzeto 2)")                           
+    p.add_argument("--hollow-radius", type=int, default=1,                                                        
+                help="debelina obrisa pri izdolbenju zalitih ploskev (privzeto 1; tanjsi obris = manj zatemnjene stene)")
     p.add_argument("--max-size", type=int, default=2000,                                                           
                 help="največja dolžina stranice pred obdelavo (privzeto 2000)")                                 
     p.add_argument("--fmt", choices=["png", "jpg"], default="png",                                                 
